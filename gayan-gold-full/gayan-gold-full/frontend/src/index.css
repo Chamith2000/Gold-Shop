@@ -1,0 +1,74 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --brand-maroon: #5A0F1B;
+    --brand-accent: #B54E0E;
+    --brand-gold: #D4AF37;
+    --brand-gold-light: #F3E5AB;
+    --brand-gold-dark: #997A15;
+  }
+}
+
+.font-cinzel {
+  font-family: 'Cinzel', serif;
+}
+
+.font-playfair {
+  font-family: 'Playfair Display', serif;
+}
+
+.font-sans {
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+}
+
+/* Luxury Gold Text Gradient */
+.gold-gradient-text {
+  background: linear-gradient(135deg, #BF953F 0%, #FCF6BA 25%, #B38728 50%, #FBF5B7 75%, #AA771C 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.gold-border-gradient {
+  border-image: linear-gradient(135deg, #BF953F, #FCF6BA, #B38728) 1;
+}
+
+.bg-maroon {
+  background-color: #5A0F1B;
+}
+
+.text-maroon {
+  color: #5A0F1B;
+}
+
+.border-maroon {
+  border-color: #5A0F1B;
+}
+
+.bg-accent-copper {
+  background-color: #B54E0E;
+}
+
+.text-accent-copper {
+  color: #B54E0E;
+}
+
+/* Custom delicate scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #F5F1EB;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #D4AF37;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #B54E0E;
+}
+

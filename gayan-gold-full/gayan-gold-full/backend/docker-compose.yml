@@ -1,0 +1,45 @@
+version: "3.8"
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: gayan-gold-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root_secret}
+      MYSQL_DATABASE: ${DB_NAME:-gayan_gold}
+      MYSQL_USER: ${DB_USERNAME:-gayan}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-gayan_gold_secret}
+    ports:
+      - "${DB_PORT:-3306}:3306"
+    volumes:
+      - gayan_gold_mysql_data:/var/lib/mysql
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci --default-authentication-plugin=caching_sha2_password
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-root_secret}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  # Optional: run the Spring Boot app in Docker as well
+  # backend:
+  #   build: .
+  #   container_name: gayan-gold-backend
+  #   depends_on:
+  #     mysql:
+  #       condition: service_healthy
+  #   environment:
+  #     DB_HOST: mysql
+  #     DB_PORT: 3306
+  #     DB_NAME: gayan_gold
+  #     DB_USERNAME: gayan
+  #     DB_PASSWORD: gayan_gold_secret
+  #     JWT_SECRET: GayanGoldHouseSuperSecretKeyForJWT2026MustBeLongEnoughForHS256Algorithm!!
+  #     SPRING_PROFILES_ACTIVE: docker
+  #   ports:
+  #     - "8080:8080"
+
+volumes:
+  gayan_gold_mysql_data:
+    driver: local
