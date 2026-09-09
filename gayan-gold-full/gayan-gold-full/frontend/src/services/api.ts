@@ -171,26 +171,26 @@ export const api = {
       }),
   },
 
-  // Gold Rates
-  goldRates: {
-    getToday: () => request<GoldRate>("/api/gold-rates/today"),
-    getHistory: (days: number = 7) => request<GoldRate[]>(`/api/gold-rates/history?days=${days}`),
-    updateRate: (data: { rate24k: number; rate22k: number; rate18k?: number }) =>
-      request<GoldRate>("/api/gold-rates", {
-        method: "POST",
-        body: JSON.stringify(data),
-      }),
-    calculate: (data: {
-      weightGrams: number;
-      goldPurity?: string;
-      craftingFeePercent?: number;
-      gemstoneValue?: number;
-    }) =>
-      request<GoldCalculatorResult>("/api/gold-rates/calculate", {
-        method: "POST",
-        body: JSON.stringify(data),
-      }),
-  },
+    // Gold Rates
+    goldRates: {
+        getToday: () => request<GoldRate>("/api/gold-rates/today"),
+        getHistory: (days: number = 7) => request<GoldRate[]>(`/api/gold-rates/history?days=${days}`),
+        updateRate: (data: { rate24k: number; rate22k: number; rate18k?: number }) =>
+            request<GoldRate>("/api/gold-rates/update", {
+                method: "POST",
+                body: JSON.stringify(data),
+            }),
+        calculate: (data: {
+            weightGrams: number;
+            goldPurity?: string;
+            craftingFeePercent?: number;
+            gemstoneValue?: number;
+        }) =>
+            request<GoldCalculatorResult>("/api/gold-rates/calculate", {
+                method: "POST",
+                body: JSON.stringify(data),
+            }),
+    },
 
   // Rewards & Lucky Wheel
   rewards: {

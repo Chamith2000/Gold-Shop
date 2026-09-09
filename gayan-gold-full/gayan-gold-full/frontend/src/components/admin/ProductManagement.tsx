@@ -175,12 +175,13 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ onNavigate
     setIsLoading(true);
     try {
       const [prodsData, catsData] = await Promise.all([
-        api.products.getAll().catch(() => []),
-        api.categories.getAll().catch(() => []),
+        api.products.getAll(),
+        api.categories.getAll(),
       ]);
       setProducts(prodsData);
       setCategories(catsData);
     } catch (err: any) {
+      console.error("Failed to load product catalog:", err);
       setFeedback({ type: "error", message: err.message || "Failed to load product catalog" });
     } finally {
       setIsLoading(false);

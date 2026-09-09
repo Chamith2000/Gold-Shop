@@ -62,8 +62,8 @@ export const ShopPage: React.FC<ShopPageProps> = ({
 
       const data = await api.products.getAll(params);
       setProducts(data);
-    } catch {
-      // fallback
+    } catch (err) {
+      console.error("Failed to fetch products:", err);
     } finally {
       setIsLoading(false);
     }

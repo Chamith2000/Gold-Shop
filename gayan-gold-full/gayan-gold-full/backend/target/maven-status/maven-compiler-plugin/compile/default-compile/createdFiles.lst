@@ -1,2 +1,6 @@
+com/example/gayangold/service/StoreActivityService.class
+com/example/gayangold/service/AppointmentService.class
+com/example/gayangold/controller/AppointmentController.class
 com/example/gayangold/service/GoldRateService.class
+com/example/gayangold/controller/StoreActivityController.class
 com/example/gayangold/controller/GoldRateController.class

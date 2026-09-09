@@ -27,7 +27,6 @@ public class ProductService {
     private final CategoryRepository categoryRepository;
     private final ReviewRepository reviewRepository;
 
-    // 1. Transactional annotation eka add kala (Lazy load errors nathiwennna)
     @Transactional(readOnly = true)
     public List<Map<String, Object>> findAll(Map<String, String> params) {
         Specification<Product> spec = (root, query, cb) -> {
@@ -35,7 +34,6 @@ public class ProductService {
 
             if (params.get("category") != null) {
                 String cat = params.get("category");
-                // 2. Query builder eka athule DB call kireema wenuwata JOIN eka pawichi kala
                 Join<Product, Category> categoryJoin = root.join("category");
                 predicates.add(cb.or(
                         cb.equal(categoryJoin.get("id"), cat),
@@ -82,18 +80,24 @@ public class ProductService {
             return cb.and(predicates.toArray(new Predicate[0]));
         };
 
-        // 3. Immutable list ekakata sort apply kireema nawathwala aluth ArrayList ekakata gaththa
         List<Product> products = new ArrayList<>(productRepository.findAll(spec));
 
         String sort = params.getOrDefault("sort", "");
-        if ("price-low".equals(sort)) {
+        if ("price-low".equals(sort) || "price-asc".equals(sort)) {
             products.sort(Comparator.comparing(Product::getPrice));
-        } else if ("price-high".equals(sort)) {
+        } else if ("price-high".equals(sort) || "price-desc".equals(sort)) {
             products.sort(Comparator.comparing(Product::getPrice).reversed());
         } else if ("rating".equals(sort)) {
             products.sort(Comparator.comparing((Product p) -> p.getRating() != null ? p.getRating() : BigDecimal.ZERO).reversed());
-        } else {
+        } else if ("weight-desc".equals(sort)) {
+            products.sort(Comparator.comparing(Product::getWeightGrams).reversed());
+        } else if ("newest".equals(sort)) {
             products.sort(Comparator.comparing(Product::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder())));
+        } else {
+            // "featured" or unspecified: featured items first, then newest
+            products.sort(Comparator
+                    .comparing((Product p) -> Boolean.TRUE.equals(p.getIsFeatured()) ? 0 : 1)
+                    .thenComparing(Product::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder())));
         }
 
         return products.stream().map(this::toMap).collect(Collectors.toList());
@@ -172,7 +176,7 @@ public class ProductService {
         productRepository.deleteById(id);
     }
 
-    private Map<String, Object> toMap(Product p) {
+    public Map<String, Object> toMap(Product p) {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("id", p.getId());
         m.put("name", p.getName());
@@ -186,7 +190,7 @@ public class ProductService {
         m.put("description", p.getDescription());
         m.put("inStock", p.getInStock());
         m.put("stockCount", p.getStockCount());
-        m.put("images", p.getImages() != null ? p.getImages() : List.of());
+        m.put("images", p.getImages() != null ? new ArrayList<>(p.getImages()) : List.of());
         m.put("isFeatured", p.getIsFeatured());
         m.put("isNewArrival", p.getIsNewArrival());
         m.put("isBestSeller", p.getIsBestSeller());
