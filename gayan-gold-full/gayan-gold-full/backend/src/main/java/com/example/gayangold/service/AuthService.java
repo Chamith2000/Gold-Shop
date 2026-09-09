@@ -124,7 +124,7 @@ public class AuthService {
         return m;
     }
 
-    private Map<String, Object> toProfileMap(RewardProfile p) {
+    public Map<String, Object> toProfileMap(RewardProfile p) {
         Map<String, Object> m = new HashMap<>();
         m.put("id", p.getId());
         m.put("userId", p.getUser().getId());
