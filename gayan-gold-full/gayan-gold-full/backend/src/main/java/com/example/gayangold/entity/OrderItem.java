@@ -37,6 +37,7 @@ public class OrderItem {
     @Column(length = 10)
     private String goldPurity;
 
-    @Column(length = 500)
+    @Lob
+    @Column(columnDefinition = "LONGTEXT")
     private String image;
 }

@@ -1,0 +1,1 @@
+ALTER TABLE order_items MODIFY COLUMN image LONGTEXT;
