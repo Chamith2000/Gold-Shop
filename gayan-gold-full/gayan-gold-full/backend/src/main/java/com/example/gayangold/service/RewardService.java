@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -44,12 +45,16 @@ public class RewardService {
 
     public Map<String, Object> getSpinStatus(User user) {
         List<Segment> segments = segments();
-        Instant next = spinRepository.findTopByUserIdOrderBySpunAtDesc(user.getId())
-                .map(LuckySpinRecord::getNextEligibleAt).orElse(null);
+        LuckySpinRecord previous = spinRepository.findTopByUserIdOrderBySpunAtDesc(user.getId()).orElse(null);
+        Instant next = previous == null ? null : previous.getNextEligibleAt();
         long remaining = next == null ? 0 : Math.max(0, Duration.between(Instant.now(), next).getSeconds());
-        return Map.of("eligible", remaining == 0, "secondsRemaining", remaining,
-                "lastSpunAt", spinRepository.findTopByUserIdOrderBySpunAtDesc(user.getId()).map(s -> s.getSpunAt()).orElse(null),
-                "nextEligibleAt", next, "segments", segments.stream().map(Segment::toMap).toList());
+        Map<String, Object> result = new HashMap<>();
+        result.put("eligible", remaining == 0);
+        result.put("secondsRemaining", remaining);
+        result.put("lastSpunAt", previous == null ? null : previous.getSpunAt());
+        result.put("nextEligibleAt", next);
+        result.put("segments", segments.stream().map(Segment::toMap).toList());
+        return result;
     }
 
     @Transactional
@@ -80,10 +85,14 @@ public class RewardService {
                 .balanceAfter(profile.getCurrentPoints()).build();
         transactionRepository.save(tx);
 
-        return Map.of("message", reward > 0 ? "Congratulations! You won " + reward + " points." : "Better luck next time!",
-                "winningSegment", segment.toMap(), "rewardPoints", reward,
-                "rewardProfile", authService.toProfileMap(profile), "nextEligibleAt", next,
-                "secondsRemaining", COOLDOWN_SECONDS);
+        Map<String, Object> result = new HashMap<>();
+        result.put("message", reward > 0 ? "Congratulations! You won " + reward + " points." : "Better luck next time!");
+        result.put("winningSegment", segment.toMap());
+        result.put("rewardPoints", reward);
+        result.put("rewardProfile", authService.toProfileMap(profile));
+        result.put("nextEligibleAt", next);
+        result.put("secondsRemaining", COOLDOWN_SECONDS);
+        return result;
     }
 
     private RewardProfile getOrCreateProfile(User user) {
@@ -94,7 +103,6 @@ public class RewardService {
 
     private Segment weightedPick(RewardProfile.Tier tier) {
         List<Segment> all = segments();
-        // Gold/Platinum have better odds for higher-value rewards.
         double total = all.stream().mapToDouble(s -> s.weight * multiplierForTier(s.points, tier)).sum();
         double r = random.nextDouble() * total;
         for (Segment s : all) {
@@ -106,8 +114,8 @@ public class RewardService {
 
     private double multiplierForTier(int points, RewardProfile.Tier tier) {
         if (points >= 500 && tier == RewardProfile.Tier.GOLD) return 1.5;
-        if (points >= 250 && tier == RewardProfile.Tier.PLATINUM) return 2.0;
         if (points >= 500 && tier == RewardProfile.Tier.PLATINUM) return 2.5;
+        if (points >= 250 && tier == RewardProfile.Tier.PLATINUM) return 2.0;
         return 1.0;
     }
 
@@ -142,6 +150,10 @@ public class RewardService {
     }
 
     private record Segment(String id, String name, int points, double weight) {
-        Map<String, Object> toMap() { return Map.of("id", id, "name", name, "rewardType", points > 0 ? "POINTS" : "BETTER_LUCK", "rewardPoints", points, "probability", weight, "active", true, "displayOrder", Integer.parseInt(id.substring(4))); }
+        Map<String, Object> toMap() {
+            return Map.of("id", id, "name", name, "rewardType", points > 0 ? "POINTS" : "BETTER_LUCK",
+                    "rewardPoints", points, "probability", weight, "active", true,
+                    "displayOrder", Integer.parseInt(id.substring(4)));
+        }
     }
 }
