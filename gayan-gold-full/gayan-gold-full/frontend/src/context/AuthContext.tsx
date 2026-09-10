@@ -9,8 +9,8 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isAdmin: boolean;
   isLoading: boolean;
-  login: (credentials: { email: string; password: string }) => Promise<void>;
-  register: (data: { fullName: string; email: string; password: string; phone?: string }) => Promise<void>;
+  login: (credentials: { email: string; password: string }) => Promise<User>;
+  register: (data: { fullName: string; email: string; password: string; phone?: string }) => Promise<User>;
   logout: () => void;
   refreshProfile: () => Promise<void>;
   updateUser: (updatedUser: User) => void;
@@ -61,6 +61,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setToken(data.token);
       setUser(data.user);
       setRewardProfile(data.rewardProfile);
+      return data.user;
     } finally {
       setIsLoading(false);
     }
@@ -74,6 +75,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setToken(res.token);
       setUser(res.user);
       setRewardProfile(res.rewardProfile);
+      return res.user;
     } finally {
       setIsLoading(false);
     }
@@ -103,24 +105,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        rewardProfile,
-        token,
-        isAuthenticated: !!user,
-        isAdmin: user?.role === "ADMIN",
-        isLoading,
-        login,
-        register,
-        logout,
-        refreshProfile,
-        updateUser,
-        setRewardProfile,
-      }}
-    >
-      {children}
-    </AuthContext.Provider>
+      <AuthContext.Provider
+          value={{
+            user,
+            rewardProfile,
+            token,
+            isAuthenticated: !!user,
+            isAdmin: user?.role === "ADMIN",
+            isLoading,
+            login,
+            register,
+            logout,
+            refreshProfile,
+            updateUser,
+            setRewardProfile,
+          }}
+      >
+        {children}
+      </AuthContext.Provider>
   );
 };
 

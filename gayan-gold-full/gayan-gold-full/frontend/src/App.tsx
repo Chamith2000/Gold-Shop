@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { AuthProvider } from "./context/AuthContext";
+import { AuthProvider, useAuth } from "./context/AuthContext";
 import { CartProvider } from "./context/CartContext";
 import { WishlistProvider } from "./context/WishlistContext";
 import { TrafficProvider } from "./context/TrafficContext";
 
 import { Navbar } from "./components/layout/Navbar";
+import { AdminHeader } from "./components/layout/AdminHeader";
 import { Footer } from "./components/layout/Footer";
 import { Breadcrumbs, BreadcrumbItem } from "./components/layout/Breadcrumbs";
 import { FloatingNavHub } from "./components/layout/FloatingNavHub";
@@ -38,6 +39,8 @@ interface NavigationState {
 }
 
 const MainLayout: React.FC = () => {
+  const { isAdmin, isLoading: authLoading } = useAuth();
+
   const getInitialView = (): string => {
     const path = window.location.pathname.replace(/^\//, "").toLowerCase();
     if (path === "gift-celebration" || path === "gifts" || path === "celebration") return "gift-celebration";
@@ -103,6 +106,15 @@ const MainLayout: React.FC = () => {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, [navState.view, navState.selectedProduct?.id]);
 
+  // Route guard: block non-admins from ever reaching the admin view,
+  // including via direct URL entry (e.g. typing /admin in the address bar).
+  useEffect(() => {
+    if (navState.view === "admin" && !authLoading && !isAdmin) {
+      handleNavigate("home");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [navState.view, authLoading, isAdmin]);
+
   const handleSelectProduct = (product: Product) => {
     setNavState({
       view: "product-detail",
@@ -139,8 +151,8 @@ const MainLayout: React.FC = () => {
         return [{ label: "Gold Rates & History" }];
       case "shop":
         return navState.params?.category
-          ? [{ label: "Collections", view: "shop" }, { label: navState.params.category }]
-          : [{ label: "Boutique Collections" }];
+            ? [{ label: "Collections", view: "shop" }, { label: navState.params.category }]
+            : [{ label: "Boutique Collections" }];
       case "product-detail":
         return [
           { label: "Collections", view: "shop" },
@@ -170,172 +182,191 @@ const MainLayout: React.FC = () => {
   const breadcrumbItems = getBreadcrumbs();
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#FAF8F5] text-stone-900 font-sans antialiased selection:bg-[#B54E0E] selection:text-white pb-14 md:pb-0">
-      {/* 1. Global Navigation Bar */}
-      <Navbar
-        currentView={navState.view}
-        onNavigate={handleNavigate}
-        onOpenLuckyWheel={() => setIsLuckyWheelOpen(true)}
-      />
-
-      {/* Main Content Area (padding-top accounts for fixed navbar) */}
-      <main className="flex-1 pt-24 sm:pt-28">
-        {/* Contextual Breadcrumbs for Sub-pages */}
-        {navState.view !== "home" && breadcrumbItems.length > 0 && (
-          <div className="border-b border-[#E8E1D5]/60 bg-white/70 backdrop-blur-xs">
-            <Breadcrumbs items={breadcrumbItems} onNavigate={handleNavigate} />
-          </div>
+      <div
+          className={`min-h-screen flex flex-col bg-[#FAF8F5] text-stone-900 font-sans antialiased selection:bg-[#B54E0E] selection:text-white ${
+              isAdmin ? "" : "pb-14 md:pb-0"
+          }`}
+      >
+        {/* 1. Global Navigation — admins get a minimal console header instead of the storefront nav */}
+        {isAdmin ? (
+            <AdminHeader onNavigate={handleNavigate} />
+        ) : (
+            <Navbar
+                currentView={navState.view}
+                onNavigate={handleNavigate}
+                onOpenLuckyWheel={() => setIsLuckyWheelOpen(true)}
+            />
         )}
 
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={navState.view + (navState.selectedProduct?.id || "")}
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.22, ease: "easeOut" }}
-          >
-            {navState.view === "home" && (
-              <HomePage
+        {/* Main Content Area (padding-top accounts for the fixed storefront navbar; the admin header is static) */}
+        <main className={`flex-1 ${isAdmin ? "" : "pt-24 sm:pt-28"}`}>
+          {/* Contextual Breadcrumbs for Sub-pages — storefront only */}
+          {!isAdmin && navState.view !== "home" && breadcrumbItems.length > 0 && (
+              <div className="border-b border-[#E8E1D5]/60 bg-white/70 backdrop-blur-xs">
+                <Breadcrumbs items={breadcrumbItems} onNavigate={handleNavigate} />
+              </div>
+          )}
+
+          <AnimatePresence mode="wait">
+            <motion.div
+                key={navState.view + (navState.selectedProduct?.id || "")}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.22, ease: "easeOut" }}
+            >
+              {navState.view === "home" && (
+                  <HomePage
+                      onNavigate={handleNavigate}
+                      onSelectProduct={handleSelectProduct}
+                      onOpenLuckyWheel={() => setIsLuckyWheelOpen(true)}
+                  />
+              )}
+
+              {navState.view === "gift-celebration" && <GiftCelebrationPage />}
+
+              {navState.view === "offers" && (
+                  <OffersPage
+                      onNavigateToShop={() => handleNavigate("shop")}
+                      onNavigateToGifts={() => handleNavigate("gift-celebration")}
+                  />
+              )}
+
+              {navState.view === "shop" && (
+                  <ShopPage
+                      initialCategory={navState.params?.category}
+                      initialSearch={navState.params?.search}
+                      onSelectProduct={handleSelectProduct}
+                  />
+              )}
+
+              {navState.view === "product-detail" && (
+                  <ProductDetailPage
+                      productId={navState.params?.productId || navState.selectedProduct?.id || ""}
+                      onBack={() => handleNavigate("shop")}
+                      onSelectProduct={handleSelectProduct}
+                  />
+              )}
+
+              {navState.view === "appointments" && <AppointmentsPage />}
+
+              {navState.view === "rewards" && (
+                  <RewardsPage
+                      onOpenLuckyWheel={() => setIsLuckyWheelOpen(true)}
+                      onNavigateToShop={() => handleNavigate("shop")}
+                  />
+              )}
+
+              {navState.view === "wishlist" && (
+                  <WishlistPage
+                      onSelectProduct={handleSelectProduct}
+                      onNavigateToShop={() => handleNavigate("shop")}
+                  />
+              )}
+
+              {navState.view === "checkout" && (
+                  <CheckoutPage
+                      initialRedeemedPoints={redeemedPointsForCheckout}
+                      onOrderCompleted={handleOrderCompleted}
+                      onNavigateToShop={() => handleNavigate("shop")}
+                  />
+              )}
+
+              {navState.view === "account" && (
+                  <AccountPage
+                      initialTab={navState.params?.tab || "profile"}
+                      onNavigateToRewards={() => handleNavigate("rewards")}
+                      onNavigateToAppointments={() => handleNavigate("appointments")}
+                      onNavigateToShop={() => handleNavigate("shop")}
+                  />
+              )}
+
+              {navState.view === "gold-rates" && (
+                  <GoldRatesPage
+                      onNavigateToShop={() => handleNavigate("shop")}
+                      onNavigateToAppointments={() => handleNavigate("appointments")}
+                  />
+              )}
+
+              {navState.view === "about" && <AboutPage />}
+
+              {navState.view === "login" && (
+                  <LoginPage
+                      onSuccess={(destination) =>
+                          handleNavigate(destination || navState.params?.redirect || "account")
+                      }
+                  />
+              )}
+
+              {navState.view === "admin" && !authLoading && isAdmin && (
+                  <AdminPage
+                      onNavigateToShop={() => handleNavigate("shop")}
+                  />
+              )}
+            </motion.div>
+          </AnimatePresence>
+        </main>
+
+        {/* 2. Global Floating Navigation & Action Hub — storefront only, no admin equivalent needed */}
+        {!isAdmin && (
+            <FloatingNavHub
+                currentView={navState.view}
                 onNavigate={handleNavigate}
-                onSelectProduct={handleSelectProduct}
                 onOpenLuckyWheel={() => setIsLuckyWheelOpen(true)}
+            />
+        )}
+
+        {/* 3. Mobile Bottom Sticky Navigation — storefront only */}
+        {!isAdmin && (
+            <MobileBottomNav
+                currentView={navState.view}
+                onNavigate={handleNavigate}
+            />
+        )}
+
+        {/* 4-6. Customer-only shopping overlays: cart, gift popup, lucky wheel — hidden for admins */}
+        {!isAdmin && (
+            <>
+              <CartDrawer
+                  onCheckout={handleCheckout}
+                  onNavigateToShop={() => handleNavigate("shop")}
               />
-            )}
 
-            {navState.view === "gift-celebration" && <GiftCelebrationPage />}
+              <SmartGiftPopup onNavigateToGifts={() => handleNavigate("gift-celebration")} />
 
-            {navState.view === "offers" && (
-              <OffersPage
-                onNavigateToShop={() => handleNavigate("shop")}
-                onNavigateToGifts={() => handleNavigate("gift-celebration")}
+              <LuckyWheelModal
+                  isOpen={isLuckyWheelOpen}
+                  onClose={() => setIsLuckyWheelOpen(false)}
+                  onNavigateToLogin={() => {
+                    setIsLuckyWheelOpen(false);
+                    handleNavigate("login");
+                  }}
               />
-            )}
+            </>
+        )}
 
-            {navState.view === "shop" && (
-              <ShopPage
-                initialCategory={navState.params?.category}
-                initialSearch={navState.params?.search}
-                onSelectProduct={handleSelectProduct}
-              />
-            )}
-
-            {navState.view === "product-detail" && (
-              <ProductDetailPage
-                productId={navState.params?.productId || navState.selectedProduct?.id || ""}
-                onBack={() => handleNavigate("shop")}
-                onSelectProduct={handleSelectProduct}
-              />
-            )}
-
-            {navState.view === "appointments" && <AppointmentsPage />}
-
-            {navState.view === "rewards" && (
-              <RewardsPage
+        {/* 7. Global Royal Boutique Footer — entirely customer-facing (newsletter, collections,
+          wishlist, lucky wheel, order tracking), so it's skipped for the admin console */}
+        {!isAdmin && (
+            <Footer
+                onNavigate={handleNavigate}
                 onOpenLuckyWheel={() => setIsLuckyWheelOpen(true)}
-                onNavigateToShop={() => handleNavigate("shop")}
-              />
-            )}
-
-            {navState.view === "wishlist" && (
-              <WishlistPage
-                onSelectProduct={handleSelectProduct}
-                onNavigateToShop={() => handleNavigate("shop")}
-              />
-            )}
-
-            {navState.view === "checkout" && (
-              <CheckoutPage
-                initialRedeemedPoints={redeemedPointsForCheckout}
-                onOrderCompleted={handleOrderCompleted}
-                onNavigateToShop={() => handleNavigate("shop")}
-              />
-            )}
-
-            {navState.view === "account" && (
-              <AccountPage
-                initialTab={navState.params?.tab || "profile"}
-                onNavigateToRewards={() => handleNavigate("rewards")}
-                onNavigateToAppointments={() => handleNavigate("appointments")}
-                onNavigateToShop={() => handleNavigate("shop")}
-              />
-            )}
-
-            {navState.view === "gold-rates" && (
-              <GoldRatesPage
-                onNavigateToShop={() => handleNavigate("shop")}
-                onNavigateToAppointments={() => handleNavigate("appointments")}
-              />
-            )}
-
-            {navState.view === "about" && <AboutPage />}
-
-            {navState.view === "login" && (
-              <LoginPage
-                onSuccess={() => handleNavigate(navState.params?.redirect || "account")}
-              />
-            )}
-
-            {navState.view === "admin" && (
-              <AdminPage
-                onNavigateToShop={() => handleNavigate("shop")}
-              />
-            )}
-          </motion.div>
-        </AnimatePresence>
-      </main>
-
-      {/* 2. Global Floating Navigation & Action Hub */}
-      <FloatingNavHub
-        currentView={navState.view}
-        onNavigate={handleNavigate}
-        onOpenLuckyWheel={() => setIsLuckyWheelOpen(true)}
-      />
-
-      {/* 3. Mobile Bottom Sticky Navigation */}
-      <MobileBottomNav
-        currentView={navState.view}
-        onNavigate={handleNavigate}
-      />
-
-      {/* 4. Global Slide-Out Cart Drawer */}
-      <CartDrawer
-        onCheckout={handleCheckout}
-        onNavigateToShop={() => handleNavigate("shop")}
-      />
-
-      {/* 5. Smart Gift Recommendation Popup (Triggered on adding jewellery to cart) */}
-      <SmartGiftPopup onNavigateToGifts={() => handleNavigate("gift-celebration")} />
-
-      {/* 6. Daily Royal Lucky Wheel Modal */}
-      <LuckyWheelModal
-        isOpen={isLuckyWheelOpen}
-        onClose={() => setIsLuckyWheelOpen(false)}
-        onNavigateToLogin={() => {
-          setIsLuckyWheelOpen(false);
-          handleNavigate("login");
-        }}
-      />
-
-      {/* 7. Global Royal Boutique Footer */}
-      <Footer
-        onNavigate={handleNavigate}
-        onOpenLuckyWheel={() => setIsLuckyWheelOpen(true)}
-      />
-    </div>
+            />
+        )}
+      </div>
   );
 };
 
 export default function App() {
   return (
-    <AuthProvider>
-      <TrafficProvider>
-        <CartProvider>
-          <WishlistProvider>
-            <MainLayout />
-          </WishlistProvider>
-        </CartProvider>
-      </TrafficProvider>
-    </AuthProvider>
+      <AuthProvider>
+        <TrafficProvider>
+          <CartProvider>
+            <WishlistProvider>
+              <MainLayout />
+            </WishlistProvider>
+          </CartProvider>
+        </TrafficProvider>
+      </AuthProvider>
   );
 }
