@@ -1,28 +1,23 @@
-import React, { useState, useEffect } from "react";
-import {
-  Gift,
-  Tag,
-  Plus,
-  Edit,
-  Trash2,
-  Save,
-  X,
-  Check,
-  Sparkles,
-  Layers,
-  Percent,
-  Clock,
-  ArrowUp,
-  ArrowDown,
-  Eye,
-  EyeOff,
-} from "lucide-react";
-import { GiftCategory, GiftProduct, GiftComboPack, GiftRecommendation, Offer, HomepageSection } from "../../types";
+import React, { useEffect, useMemo, useState } from "react";
+import { Check, Edit, Gift, Layers, Plus, Save, Sparkles, Tag, Trash2, X } from "lucide-react";
+import { GiftCategory, GiftComboPack, GiftProduct, GiftRecommendation, HomepageSection, Offer } from "../../types";
 import { api } from "../../services/api";
+
+const inputClass = "w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-xs outline-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37]";
+const buttonClass = "px-3 py-2 bg-[#5A0F1B] text-white text-xs font-bold rounded-lg flex items-center gap-1.5 hover:bg-[#420A13] transition-colors";
+
+const defaultHomepageSections: HomepageSection[] = [
+  { id: "home-today", key: "todays_offers", title: "Today's Offers", subtitle: "Limited-time promotions", active: true, displayOrder: 1, itemIds: [] },
+  { id: "home-gifts", key: "gift_picks", title: "Gift Picks", subtitle: "Curated celebration gifts", active: true, displayOrder: 2, itemIds: [] },
+  { id: "home-wedding", key: "wedding_specials", title: "Wedding Specials", subtitle: "Special offers for weddings", active: true, displayOrder: 3, itemIds: [] },
+  { id: "home-birthday", key: "birthday_specials", title: "Birthday Specials", subtitle: "Birthday gift promotions", active: true, displayOrder: 4, itemIds: [] },
+  { id: "home-couple", key: "couple_collection", title: "Couple Collection", subtitle: "Gifts for two", active: true, displayOrder: 5, itemIds: [] },
+  { id: "home-anniversary", key: "anniversary_specials", title: "Anniversary Specials", subtitle: "Celebrate together", active: true, displayOrder: 6, itemIds: [] },
+  { id: "home-limited", key: "limited_time_offers", title: "Limited Time Offers", subtitle: "Offers ending soon", active: true, displayOrder: 7, itemIds: [] },
+];
 
 export const GiftsOffersManagement: React.FC = () => {
   const [subTab, setSubTab] = useState<"CATEGORIES" | "PRODUCTS" | "COMBOS" | "RECOMMENDATIONS" | "OFFERS" | "HOMEPAGE">("PRODUCTS");
-
   const [categories, setCategories] = useState<GiftCategory[]>([]);
   const [products, setProducts] = useState<GiftProduct[]>([]);
   const [combos, setCombos] = useState<GiftComboPack[]>([]);
@@ -31,843 +26,164 @@ export const GiftsOffersManagement: React.FC = () => {
   const [homepageSections, setHomepageSections] = useState<HomepageSection[]>([]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  // Modal / Form states
   const [editingCategory, setEditingCategory] = useState<Partial<GiftCategory> | null>(null);
   const [editingProduct, setEditingProduct] = useState<Partial<GiftProduct> | null>(null);
   const [editingCombo, setEditingCombo] = useState<Partial<GiftComboPack> | null>(null);
   const [editingRec, setEditingRec] = useState<Partial<GiftRecommendation> | null>(null);
   const [editingOffer, setEditingOffer] = useState<Partial<Offer> | null>(null);
 
-  const loadData = () => {
+  const loadData = async () => {
     setLoading(true);
-    Promise.all([
-      api.admin.getGiftCategories(),
-      api.admin.getGiftProducts(),
-      api.admin.getGiftCombos(),
-      api.admin.getGiftRecommendations(),
-      api.admin.getOffers(),
-      api.admin.getHomepageSections(),
-    ])
-      .then(([cats, prods, cmbs, recs, ffrs, secs]) => {
-        setCategories(cats || []);
-        setProducts(prods || []);
-        setCombos(cmbs || []);
-        setRecommendations(recs || []);
-        setOffers(ffrs || []);
-        setHomepageSections(secs || []);
-      })
-      .catch((err) => console.error("Error loading admin gifts & offers", err))
-      .finally(() => setLoading(false));
-  };
-
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  const showSuccess = (msg: string) => {
-    setMessage(msg);
-    setTimeout(() => setMessage(null), 3500);
-  };
-
-  // CATEGORIES CRUD
-  const handleSaveCategory = async () => {
-    if (!editingCategory?.name) return;
+    setError(null);
     try {
-      if (editingCategory.id) {
-        await api.admin.updateGiftCategory(editingCategory.id, editingCategory);
-        showSuccess(`Category "${editingCategory.name}" updated!`);
-      } else {
-        await api.admin.createGiftCategory(editingCategory);
-        showSuccess(`New gift category created!`);
-      }
-      setEditingCategory(null);
-      loadData();
+      const [cats, prods, cmbs, recs, offs, sections] = await Promise.all([
+        api.admin.getGiftCategories(),
+        api.admin.getGiftProducts(),
+        api.admin.getGiftCombos(),
+        api.admin.getGiftRecommendations(),
+        api.admin.getOffers(),
+        api.admin.getHomepageSections(),
+      ]);
+      setCategories(cats || []);
+      setProducts(prods || []);
+      setCombos(cmbs || []);
+      setRecommendations(recs || []);
+      setOffers(offs || []);
+      setHomepageSections((sections && sections.length ? sections : defaultHomepageSections).sort((a, b) => a.displayOrder - b.displayOrder));
     } catch (err: any) {
-      alert(err.message || "Failed to save category");
+      setError(err?.message || "Failed to load Gift & Offers management data.");
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleDeleteCategory = async (id: string) => {
-    if (!window.confirm("Are you sure you want to delete this gift category?")) return;
-    try {
-      await api.admin.deleteGiftCategory(id);
-      showSuccess("Gift category deleted!");
-      loadData();
-    } catch (err: any) {
-      alert(err.message || "Failed to delete category");
-    }
+  useEffect(() => { loadData(); }, []);
+
+  const success = (text: string) => { setError(null); setMessage(text); window.setTimeout(() => setMessage(null), 3500); };
+  const failure = (err: any, fallback: string) => setError(err?.message || fallback);
+
+  const save = async (fn: () => Promise<any>, text: string) => {
+    try { await fn(); success(text); await loadData(); }
+    catch (err: any) { failure(err, "Operation failed"); }
   };
 
-  // PRODUCTS CRUD
-  const handleSaveProduct = async () => {
-    if (!editingProduct?.name || !editingProduct?.price || !editingProduct?.giftCategoryId) {
-      return alert("Name, price, and category are required");
-    }
-    try {
-      if (editingProduct.id) {
-        await api.admin.updateGiftProduct(editingProduct.id, editingProduct);
-        showSuccess(`Gift product "${editingProduct.name}" updated!`);
-      } else {
-        await api.admin.createGiftProduct(editingProduct);
-        showSuccess("New gift product added!");
-      }
-      setEditingProduct(null);
-      loadData();
-    } catch (err: any) {
-      alert(err.message || "Failed to save gift product");
-    }
+  const handleDelete = async (id: string, type: "category" | "product" | "combo" | "recommendation" | "offer") => {
+    if (!window.confirm(`Delete this ${type}?`)) return;
+    const actions: Record<string, () => Promise<any>> = {
+      category: () => api.admin.deleteGiftCategory(id),
+      product: () => api.admin.deleteGiftProduct(id),
+      combo: () => api.admin.deleteGiftCombo(id),
+      recommendation: () => api.admin.deleteGiftRecommendation(id),
+      offer: () => api.admin.deleteOffer(id),
+    };
+    await save(actions[type], `${type[0].toUpperCase() + type.slice(1)} deleted successfully.`);
   };
 
-  const handleDeleteProduct = async (id: string) => {
-    if (!window.confirm("Are you sure you want to delete this gift product?")) return;
-    try {
-      await api.admin.deleteGiftProduct(id);
-      showSuccess("Gift product deleted!");
-      loadData();
-    } catch (err: any) {
-      alert(err.message || "Failed to delete product");
-    }
+  const normalizedProductIds = useMemo(() => products.map((p) => p.id), [products]);
+
+  const moveHomepage = async (index: number, direction: -1 | 1) => {
+    const next = [...homepageSections];
+    const target = index + direction;
+    if (target < 0 || target >= next.length) return;
+    [next[index], next[target]] = [next[target], next[index]];
+    next.forEach((s, i) => { s.displayOrder = i + 1; });
+    setHomepageSections(next);
+    await save(() => api.admin.updateHomepageSections(next), "Homepage section order updated.");
   };
 
-  // COMBOS CRUD
-  const handleSaveCombo = async () => {
-    if (!editingCombo?.name || !editingCombo?.comboPrice) {
-      return alert("Name and combo price are required");
-    }
-    try {
-      if (editingCombo.id) {
-        await api.admin.updateGiftCombo(editingCombo.id, editingCombo);
-        showSuccess(`Combo pack "${editingCombo.name}" updated!`);
-      } else {
-        await api.admin.createGiftCombo(editingCombo);
-        showSuccess("New gift combo pack created!");
-      }
-      setEditingCombo(null);
-      loadData();
-    } catch (err: any) {
-      alert(err.message || "Failed to save combo pack");
-    }
+  const toggleHomepage = async (index: number) => {
+    const next = homepageSections.map((s, i) => i === index ? { ...s, active: !s.active } : s);
+    next.forEach((s, i) => { s.displayOrder = i + 1; });
+    setHomepageSections(next);
+    await save(() => api.admin.updateHomepageSections(next), "Homepage visibility updated.");
   };
 
-  const handleDeleteCombo = async (id: string) => {
-    if (!window.confirm("Are you sure you want to delete this combo pack?")) return;
-    try {
-      await api.admin.deleteGiftCombo(id);
-      showSuccess("Combo pack deleted!");
-      loadData();
-    } catch (err: any) {
-      alert(err.message || "Failed to delete combo");
-    }
-  };
-
-  // RECOMMENDATIONS CRUD
-  const handleSaveRec = async () => {
-    if (!editingRec?.targetType || !editingRec?.targetId) {
-      return alert("Target Type and Target ID are required");
-    }
-    try {
-      if (editingRec.id) {
-        await api.admin.updateGiftRecommendation(editingRec.id, editingRec);
-        showSuccess("Gift recommendation rule updated!");
-      } else {
-        await api.admin.createGiftRecommendation(editingRec);
-        showSuccess("New recommendation rule created!");
-      }
-      setEditingRec(null);
-      loadData();
-    } catch (err: any) {
-      alert(err.message || "Failed to save recommendation rule");
-    }
-  };
-
-  const handleDeleteRec = async (id: string) => {
-    if (!window.confirm("Are you sure you want to delete this recommendation rule?")) return;
-    try {
-      await api.admin.deleteGiftRecommendation(id);
-      showSuccess("Recommendation rule deleted!");
-      loadData();
-    } catch (err: any) {
-      alert(err.message || "Failed to delete recommendation rule");
-    }
-  };
-
-  // OFFERS CRUD
-  const handleSaveOffer = async () => {
-    if (!editingOffer?.title || !editingOffer?.startDate) {
-      return alert("Title and start date are required");
-    }
-    try {
-      if (editingOffer.id) {
-        await api.admin.updateOffer(editingOffer.id, editingOffer);
-        showSuccess(`Offer "${editingOffer.title}" updated!`);
-      } else {
-        await api.admin.createOffer(editingOffer);
-        showSuccess("New exclusive offer created!");
-      }
-      setEditingOffer(null);
-      loadData();
-    } catch (err: any) {
-      alert(err.message || "Failed to save offer");
-    }
-  };
-
-  const handleDeleteOffer = async (id: string) => {
-    if (!window.confirm("Are you sure you want to delete this offer?")) return;
-    try {
-      await api.admin.deleteOffer(id);
-      showSuccess("Offer deleted!");
-      loadData();
-    } catch (err: any) {
-      alert(err.message || "Failed to delete offer");
-    }
-  };
-
-  // HOMEPAGE SECTIONS TOGGLE
-  const handleToggleHomepageSection = async (index: number) => {
-    const copy = [...homepageSections];
-    copy[index].active = !copy[index].active;
-    setHomepageSections(copy);
-    try {
-      await api.admin.updateHomepageSections(copy);
-      showSuccess("Homepage sections updated!");
-    } catch (err: any) {
-      alert(err.message || "Failed to update homepage sections");
-    }
-  };
+  const tabs = [
+    ["PRODUCTS", `Products (${products.length})`, Gift],
+    ["CATEGORIES", `Categories (${categories.length})`, Layers],
+    ["COMBOS", `Combo Packs (${combos.length})`, Sparkles],
+    ["RECOMMENDATIONS", `Recommendation Rules (${recommendations.length})`, Tag],
+    ["OFFERS", `Offers (${offers.length})`, Tag],
+    ["HOMEPAGE", "Homepage Content", Layers],
+  ] as const;
 
   return (
-    <div className="space-y-6">
-      {message && (
-        <div className="p-3 bg-emerald-50 border border-emerald-300 text-emerald-800 rounded-xl text-xs font-bold flex items-center justify-between">
-          <span>{message}</span>
-          <Check className="w-4 h-4 text-emerald-600" />
-        </div>
-      )}
+    <div className="space-y-5">
+      {message && <div className="p-3 bg-emerald-50 border border-emerald-300 text-emerald-800 rounded-xl text-xs font-bold flex items-center gap-2"><Check className="w-4 h-4" />{message}</div>}
+      {error && <div className="p-3 bg-rose-50 border border-rose-300 text-rose-800 rounded-xl text-xs font-semibold">{error}</div>}
 
-      {/* Sub-Tab Navigation Header */}
-      <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3 rounded-2xl border border-stone-200 shadow-xs">
-        <div className="flex items-center gap-1.5 overflow-x-auto">
-          <button
-            onClick={() => setSubTab("PRODUCTS")}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${
-              subTab === "PRODUCTS" ? "bg-[#5A0F1B] text-white" : "text-stone-600 hover:bg-stone-100"
-            }`}
-          >
-            <Gift className="w-3.5 h-3.5 text-[#D4AF37]" /> Products ({products.length})
-          </button>
-
-          <button
-            onClick={() => setSubTab("CATEGORIES")}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${
-              subTab === "CATEGORIES" ? "bg-[#5A0F1B] text-white" : "text-stone-600 hover:bg-stone-100"
-            }`}
-          >
-            <Layers className="w-3.5 h-3.5" /> Categories ({categories.length})
-          </button>
-
-          <button
-            onClick={() => setSubTab("COMBOS")}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${
-              subTab === "COMBOS" ? "bg-[#5A0F1B] text-white" : "text-stone-600 hover:bg-stone-100"
-            }`}
-          >
-            <Sparkles className="w-3.5 h-3.5 text-[#D4AF37]" /> Combo Packs ({combos.length})
-          </button>
-
-          <button
-            onClick={() => setSubTab("RECOMMENDATIONS")}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${
-              subTab === "RECOMMENDATIONS" ? "bg-[#5A0F1B] text-white" : "text-stone-600 hover:bg-stone-100"
-            }`}
-          >
-            Recommendation Rules ({recommendations.length})
-          </button>
-
-          <button
-            onClick={() => setSubTab("OFFERS")}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${
-              subTab === "OFFERS" ? "bg-[#5A0F1B] text-white" : "text-stone-600 hover:bg-stone-100"
-            }`}
-          >
-            <Tag className="w-3.5 h-3.5 text-[#D4AF37]" /> Offers ({offers.length})
-          </button>
-
-          <button
-            onClick={() => setSubTab("HOMEPAGE")}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${
-              subTab === "HOMEPAGE" ? "bg-[#5A0F1B] text-white" : "text-stone-600 hover:bg-stone-100"
-            }`}
-          >
-            Homepage Content
-          </button>
-        </div>
-
-        <div>
-          {subTab === "PRODUCTS" && (
-            <button
-              onClick={() => setEditingProduct({ name: "", price: 1000, stockQuantity: 10, inStock: true, occasion: "Birthday", giftCategoryId: categories[0]?.id || "gcat-combos" })}
-              className="px-3 py-1.5 bg-[#5A0F1B] text-white text-xs font-bold rounded-lg flex items-center gap-1"
-            >
-              <Plus className="w-4 h-4 text-[#D4AF37]" /> Add Gift Product
+      <div className="bg-white p-3 rounded-2xl border border-stone-200 shadow-sm">
+        <div className="flex flex-wrap gap-2">
+          {tabs.map(([id, label, Icon]) => (
+            <button key={id} onClick={() => setSubTab(id)} className={`px-3 py-2 rounded-lg text-[11px] font-bold uppercase tracking-wide flex items-center gap-1.5 ${subTab === id ? "bg-[#5A0F1B] text-white" : "text-stone-600 hover:bg-stone-100"}`}>
+              <Icon className="w-3.5 h-3.5" /> {label}
             </button>
-          )}
-          {subTab === "CATEGORIES" && (
-            <button
-              onClick={() => setEditingCategory({ name: "", description: "", active: true })}
-              className="px-3 py-1.5 bg-[#5A0F1B] text-white text-xs font-bold rounded-lg flex items-center gap-1"
-            >
-              <Plus className="w-4 h-4 text-[#D4AF37]" /> Add Gift Category
-            </button>
-          )}
-          {subTab === "COMBOS" && (
-            <button
-              onClick={() => setEditingCombo({ name: "", comboPrice: 5000, individualValue: 6500, items: ["Item 1", "Item 2"], active: true })}
-              className="px-3 py-1.5 bg-[#5A0F1B] text-white text-xs font-bold rounded-lg flex items-center gap-1"
-            >
-              <Plus className="w-4 h-4 text-[#D4AF37]" /> Add Combo Pack
-            </button>
-          )}
-          {subTab === "RECOMMENDATIONS" && (
-            <button
-              onClick={() => setEditingRec({ targetType: "CATEGORY", targetId: "cat-bridal", recommendedGiftIds: [], active: true })}
-              className="px-3 py-1.5 bg-[#5A0F1B] text-white text-xs font-bold rounded-lg flex items-center gap-1"
-            >
-              <Plus className="w-4 h-4 text-[#D4AF37]" /> Add Recommendation Rule
-            </button>
-          )}
-          {subTab === "OFFERS" && (
-            <button
-              onClick={() => setEditingOffer({ title: "", startDate: new Date().toISOString(), offerType: "TODAY", active: true })}
-              className="px-3 py-1.5 bg-[#5A0F1B] text-white text-xs font-bold rounded-lg flex items-center gap-1"
-            >
-              <Plus className="w-4 h-4 text-[#D4AF37]" /> Add Exclusive Offer
-            </button>
-          )}
+          ))}
         </div>
       </div>
 
-      {/* 1. GIFT PRODUCTS MANAGEMENT */}
-      {subTab === "PRODUCTS" && (
-        <div className="bg-white rounded-2xl border border-stone-200 overflow-hidden shadow-xs">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-[#5A0F1B] text-white font-cinzel text-[11px] uppercase">
-              <tr>
-                <th className="p-3">Product</th>
-                <th className="p-3">Category</th>
-                <th className="p-3">Price</th>
-                <th className="p-3">Stock</th>
-                <th className="p-3">Occasion</th>
-                <th className="p-3 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-stone-100">
-              {products.map((p) => (
-                <tr key={p.id} className="hover:bg-stone-50">
-                  <td className="p-3 flex items-center gap-2.5">
-                    <img src={p.mainImage} alt="" className="w-9 h-9 rounded object-cover border border-stone-200 shrink-0" />
-                    <div>
-                      <span className="font-bold text-stone-900 line-clamp-1">{p.name}</span>
-                      <span className="text-[10px] text-stone-400 font-mono">{p.id}</span>
-                    </div>
-                  </td>
-                  <td className="p-3 font-semibold text-stone-700">{p.giftCategoryName}</td>
-                  <td className="p-3 font-bold text-[#5A0F1B]">Rs. {p.price.toLocaleString()}</td>
-                  <td className="p-3">
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${p.inStock ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"}`}>
-                      {p.stockQuantity} in stock
-                    </span>
-                  </td>
-                  <td className="p-3 text-stone-600">{p.occasion || "General"}</td>
-                  <td className="p-3 text-right space-x-1">
-                    <button onClick={() => setEditingProduct(p)} className="p-1 text-stone-600 hover:text-[#5A0F1B]">
-                      <Edit className="w-4 h-4" />
-                    </button>
-                    <button onClick={() => handleDeleteProduct(p.id)} className="p-1 text-stone-400 hover:text-rose-600">
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <div className="flex justify-end">
+        {subTab === "PRODUCTS" && <button className={buttonClass} onClick={() => setEditingProduct({ name: "", price: 1000, stockQuantity: 10, inStock: true, occasion: "Birthday", giftCategoryId: categories[0]?.id || "" })}><Plus className="w-4 h-4" /> Add Gift Product</button>}
+        {subTab === "CATEGORIES" && <button className={buttonClass} onClick={() => setEditingCategory({ name: "", description: "", imageUrl: "", active: true })}><Plus className="w-4 h-4" /> Add Gift Category</button>}
+        {subTab === "COMBOS" && <button className={buttonClass} onClick={() => setEditingCombo({ name: "", comboPrice: 5000, individualValue: 6500, items: [], image: "", inStock: true, stockCount: 10, active: true })}><Plus className="w-4 h-4" /> Add Combo Pack</button>}
+        {subTab === "RECOMMENDATIONS" && <button className={buttonClass} onClick={() => setEditingRec({ targetType: "PRODUCT", targetId: products[0]?.id || "", recommendedGiftIds: products.slice(0, 2).map(p => p.id), recommendedCategoryIds: [], priority: 1, active: true })}><Plus className="w-4 h-4" /> Add Recommendation Rule</button>}
+        {subTab === "OFFERS" && <button className={buttonClass} onClick={() => setEditingOffer({ title: "", subtitle: "", description: "", bannerImage: "", discountPercent: 0, startDate: new Date().toISOString(), endDate: "", offerType: "GIFT", applicableProductIds: [], applicableCategoryIds: [], isFeatured: true, active: true, termsAndConditions: "" })}><Plus className="w-4 h-4" /> Add Exclusive Offer</button>}
+      </div>
 
-      {/* 2. GIFT CATEGORIES MANAGEMENT */}
-      {subTab === "CATEGORIES" && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-          {categories.map((c) => (
-            <div key={c.id} className="bg-white p-4 rounded-2xl border border-stone-200 flex gap-3 items-center justify-between shadow-2xs">
-              <div className="flex items-center gap-3">
-                <img src={c.imageUrl} alt="" className="w-12 h-12 rounded-xl object-cover border border-stone-200" />
-                <div>
-                  <h4 className="font-cinzel text-xs font-bold text-stone-900">{c.name}</h4>
-                  <span className="text-[10px] text-stone-500">{c.productCount || 0} products</span>
-                </div>
-              </div>
-              <div className="flex items-center gap-1">
-                <button onClick={() => setEditingCategory(c)} className="p-1.5 text-stone-600 hover:text-[#5A0F1B]">
-                  <Edit className="w-4 h-4" />
-                </button>
-                <button onClick={() => handleDeleteCategory(c.id)} className="p-1.5 text-stone-400 hover:text-rose-600">
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+      {loading && <div className="py-8 text-center text-xs text-stone-500">Loading Gift & Offers...</div>}
 
-      {/* 3. GIFT COMBOS MANAGEMENT */}
-      {subTab === "COMBOS" && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {combos.map((cmb) => (
-            <div key={cmb.id} className="bg-white p-4 rounded-2xl border border-stone-200 flex gap-4 justify-between shadow-2xs">
-              <img src={cmb.image} alt="" className="w-24 h-24 rounded-xl object-cover border border-stone-200 shrink-0" />
-              <div className="flex-1 min-w-0 space-y-1">
-                <h4 className="font-cinzel text-sm font-bold text-stone-900">{cmb.name}</h4>
-                <p className="text-xs text-stone-500 line-clamp-1">{cmb.description}</p>
-                <div className="text-xs">
-                  <span className="font-bold text-[#5A0F1B]">Combo: Rs. {cmb.comboPrice.toLocaleString()}</span>
-                  <span className="text-[11px] text-emerald-600 ml-2 font-semibold">(You save Rs. {cmb.youSave.toLocaleString()})</span>
-                </div>
-              </div>
-              <div className="flex flex-col justify-between">
-                <button onClick={() => setEditingCombo(cmb)} className="p-1 text-stone-600 hover:text-[#5A0F1B]">
-                  <Edit className="w-4 h-4" />
-                </button>
-                <button onClick={() => handleDeleteCombo(cmb.id)} className="p-1 text-stone-400 hover:text-rose-600">
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+      {!loading && subTab === "PRODUCTS" && <div className="bg-white rounded-2xl border border-stone-200 overflow-hidden"><div className="overflow-x-auto"><table className="w-full text-left text-xs"><thead className="bg-[#5A0F1B] text-white"><tr><th className="p-3">Product</th><th className="p-3">Category</th><th className="p-3">Price</th><th className="p-3">Stock</th><th className="p-3">Actions</th></tr></thead><tbody className="divide-y">{products.map(p => <tr key={p.id}><td className="p-3"><div className="font-bold">{p.name}</div><div className="text-[10px] text-stone-400">{p.id}</div></td><td className="p-3">{p.giftCategoryName || p.giftCategoryId}</td><td className="p-3 font-bold">Rs. {Number(p.price || 0).toLocaleString()}</td><td className="p-3">{p.stockQuantity ?? 0}</td><td className="p-3"><button onClick={() => setEditingProduct(p)} className="p-1"><Edit className="w-4 h-4" /></button><button onClick={() => handleDelete(p.id, "product")} className="p-1 text-rose-600"><Trash2 className="w-4 h-4" /></button></td></tr>)}</tbody></table></div></div>}
 
-      {/* 4. RECOMMENDATIONS MANAGEMENT */}
-      {subTab === "RECOMMENDATIONS" && (
-        <div className="bg-white rounded-2xl border border-stone-200 overflow-hidden">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-[#5A0F1B] text-white font-cinzel text-[11px]">
-              <tr>
-                <th className="p-3">Target Type</th>
-                <th className="p-3">Target ID</th>
-                <th className="p-3">Recommended Gifts</th>
-                <th className="p-3">Priority</th>
-                <th className="p-3 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-stone-100">
-              {recommendations.map((r) => (
-                <tr key={r.id} className="hover:bg-stone-50">
-                  <td className="p-3 font-bold text-stone-900">{r.targetType}</td>
-                  <td className="p-3 font-mono text-stone-700">{r.targetId}</td>
-                  <td className="p-3 text-stone-600">{r.recommendedGiftIds?.join(", ") || "Default"}</td>
-                  <td className="p-3">{r.priority}</td>
-                  <td className="p-3 text-right space-x-1">
-                    <button onClick={() => setEditingRec(r)} className="p-1 text-stone-600 hover:text-[#5A0F1B]">
-                      <Edit className="w-4 h-4" />
-                    </button>
-                    <button onClick={() => handleDeleteRec(r.id)} className="p-1 text-stone-400 hover:text-rose-600">
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      {!loading && subTab === "CATEGORIES" && <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">{categories.map(c => <div key={c.id} className="bg-white p-4 rounded-2xl border border-stone-200 flex justify-between gap-3"><div><h4 className="font-bold text-sm">{c.name}</h4><p className="text-xs text-stone-500">{c.description || "No description"}</p></div><div className="flex gap-1"><button onClick={() => setEditingCategory(c)}><Edit className="w-4 h-4" /></button><button onClick={() => handleDelete(c.id, "category")} className="text-rose-600"><Trash2 className="w-4 h-4" /></button></div></div>)}</div>}
 
-      {/* 5. EXCLUSIVE OFFERS MANAGEMENT */}
-      {subTab === "OFFERS" && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {offers.map((o) => (
-            <div key={o.id} className="bg-white p-4 rounded-2xl border border-stone-200 space-y-2 shadow-2xs">
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold text-[#5A0F1B] uppercase tracking-wider bg-amber-50 px-2.5 py-0.5 rounded border border-amber-200">
-                  {o.offerType} OFFER
-                </span>
-                <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${o.active ? "bg-emerald-100 text-emerald-800" : "bg-stone-100 text-stone-600"}`}>
-                  {o.active ? "ACTIVE" : "INACTIVE"}
-                </span>
-              </div>
-              <h4 className="font-cinzel text-sm font-bold text-stone-900">{o.title}</h4>
-              <p className="text-xs text-stone-600 line-clamp-2">{o.description}</p>
-              <div className="flex items-center justify-between pt-2 border-t border-stone-100 text-xs">
-                <span className="text-stone-500">Discount: {o.discountPercent}%</span>
-                <div className="space-x-2">
-                  <button onClick={() => setEditingOffer(o)} className="text-stone-600 hover:text-[#5A0F1B] font-semibold">
-                    Edit
-                  </button>
-                  <button onClick={() => handleDeleteOffer(o.id)} className="text-stone-400 hover:text-rose-600 font-semibold">
-                    Delete
-                  </button>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+      {!loading && subTab === "COMBOS" && <div className="grid md:grid-cols-2 gap-4">{combos.map(c => <div key={c.id} className="bg-white p-4 rounded-2xl border border-stone-200"><div className="flex justify-between"><div><h4 className="font-bold">{c.name}</h4><p className="text-xs text-stone-500 mt-1">{c.items?.join(", ") || "No items configured"}</p></div><div className="flex gap-1"><button onClick={() => setEditingCombo(c)}><Edit className="w-4 h-4" /></button><button onClick={() => handleDelete(c.id, "combo")} className="text-rose-600"><Trash2 className="w-4 h-4" /></button></div></div><div className="mt-3 text-xs"><b>Combo:</b> Rs. {Number(c.comboPrice || 0).toLocaleString()} <span className="text-emerald-700 ml-2">Save Rs. {Number(c.youSave || 0).toLocaleString()}</span></div></div>)}</div>}
 
-      {/* 6. HOMEPAGE CONTENT MANAGEMENT */}
-      {subTab === "HOMEPAGE" && (
-        <div className="bg-white rounded-2xl border border-stone-200 p-6 space-y-4">
-          <h3 className="font-cinzel text-sm font-bold text-[#5A0F1B] uppercase tracking-wider">
-            Homepage Content Sections Visibility &amp; Ordering
-          </h3>
-          <p className="text-xs text-stone-500">
-            Control which promotional and gift sections appear on the homepage and their relative priority.
-          </p>
+      {!loading && subTab === "RECOMMENDATIONS" && <div className="bg-white rounded-2xl border border-stone-200 overflow-hidden"><table className="w-full text-left text-xs"><thead className="bg-[#5A0F1B] text-white"><tr><th className="p-3">Target</th><th className="p-3">Recommended Gifts</th><th className="p-3">Priority</th><th className="p-3">Actions</th></tr></thead><tbody className="divide-y">{recommendations.map(r => <tr key={r.id}><td className="p-3"><b>{r.targetType}</b><div className="font-mono text-[10px] text-stone-500">{r.targetId}</div></td><td className="p-3">{r.recommendedGiftIds?.length ? r.recommendedGiftIds.map(id => products.find(p => p.id === id)?.name || id).join(", ") : "No gift selected"}</td><td className="p-3">{r.priority ?? 1}</td><td className="p-3"><button onClick={() => setEditingRec(r)} className="p-1"><Edit className="w-4 h-4" /></button><button onClick={() => handleDelete(r.id, "recommendation")} className="p-1 text-rose-600"><Trash2 className="w-4 h-4" /></button></td></tr>)}</tbody></table></div>}
 
-          <div className="space-y-2">
-            {homepageSections.map((sec, idx) => (
-              <div key={sec.id} className="flex items-center justify-between p-3 bg-stone-50 rounded-xl border border-stone-200">
-                <div className="flex items-center gap-3">
-                  <span className="w-6 h-6 rounded-full bg-[#5A0F1B]/10 text-[#5A0F1B] text-xs font-bold flex items-center justify-center">
-                    {idx + 1}
-                  </span>
-                  <div>
-                    <h4 className="font-cinzel text-xs font-bold text-stone-900">{sec.title}</h4>
-                    <p className="text-[11px] text-stone-500">{sec.subtitle}</p>
-                  </div>
-                </div>
+      {!loading && subTab === "OFFERS" && <div className="grid md:grid-cols-2 gap-4">{offers.map(o => <div key={o.id} className="bg-white rounded-2xl border border-stone-200 p-4 space-y-2"><div className="flex justify-between gap-3"><div><h4 className="font-bold">{o.title}</h4><p className="text-[10px] text-stone-500">{o.offerType} · {o.calculatedStatus || "SCHEDULED"}</p></div><div className="flex gap-1"><button onClick={() => setEditingOffer(o)}><Edit className="w-4 h-4" /></button><button onClick={() => handleDelete(o.id, "offer")} className="text-rose-600"><Trash2 className="w-4 h-4" /></button></div></div><p className="text-xs text-stone-600">{o.description || "No description"}</p><div className="text-xs font-semibold">{o.discountPercent ? `${o.discountPercent}% discount` : o.specialPrice ? `Special price Rs. ${o.specialPrice.toLocaleString()}` : "Promotion"}</div><div className="text-[10px] text-stone-500">Products: {o.applicableProductIds?.length ? o.applicableProductIds.map(id => products.find(p => p.id === id)?.name || id).join(", ") : "All eligible products"}</div><div className="text-[10px] text-stone-500">Categories: {o.applicableCategoryIds?.length ? o.applicableCategoryIds.map(id => categories.find(c => c.id === id)?.name || id).join(", ") : "All categories"}</div></div>)}</div>}
 
-                <button
-                  onClick={() => handleToggleHomepageSection(idx)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors ${
-                    sec.active ? "bg-emerald-600 text-white" : "bg-stone-200 text-stone-600"
-                  }`}
-                >
-                  {sec.active ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
-                  {sec.active ? "VISIBLE" : "HIDDEN"}
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      {!loading && subTab === "HOMEPAGE" && <div className="bg-white rounded-2xl border border-stone-200 p-5 space-y-3"><div><h3 className="font-cinzel text-lg font-bold text-[#5A0F1B]">Homepage Content Sections Visibility & Ordering</h3><p className="text-xs text-stone-500 mt-1">Enable or disable promotional sections and move them up or down to control their priority.</p></div>{homepageSections.map((s, i) => <div key={s.id} className="flex flex-wrap items-center gap-3 p-3 rounded-xl border border-stone-200"><button onClick={() => toggleHomepage(i)} className={`w-9 h-9 rounded-lg flex items-center justify-center ${s.active ? "bg-emerald-100 text-emerald-700" : "bg-stone-100 text-stone-400"}`}>{s.active ? <Check className="w-4 h-4" /> : <X className="w-4 h-4" />}</button><div className="flex-1 min-w-[200px]"><div className="font-bold text-sm">{s.title}</div><div className="text-[10px] text-stone-500">{s.key} · Priority {i + 1}</div><div className="text-xs text-stone-500">{s.subtitle}</div></div><button disabled={i === 0} onClick={() => moveHomepage(i, -1)} className="px-2 py-1 border rounded disabled:opacity-30">↑</button><button disabled={i === homepageSections.length - 1} onClick={() => moveHomepage(i, 1)} className="px-2 py-1 border rounded disabled:opacity-30">↓</button></div>)}</div>}
 
-      {/* EDIT/CREATE PRODUCT MODAL */}
-      {editingProduct && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
-          <div className="bg-white rounded-2xl max-w-lg w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center border-b pb-3">
-              <h3 className="font-cinzel font-bold text-sm text-[#5A0F1B]">
-                {editingProduct.id ? "Edit Gift Product" : "Create New Gift Product"}
-              </h3>
-              <button onClick={() => setEditingProduct(null)}><X className="w-5 h-5" /></button>
-            </div>
+      {editingProduct && <Modal title={editingProduct.id ? "Edit Gift Product" : "Create Gift Product"} onClose={() => setEditingProduct(null)} onSave={() => save(() => editingProduct.id ? api.admin.updateGiftProduct(editingProduct.id, editingProduct) : api.admin.createGiftProduct(editingProduct), "Gift product saved successfully.").then(() => setEditingProduct(null))}>
+        <Field label="Name"><input className={inputClass} value={editingProduct.name || ""} onChange={e => setEditingProduct({ ...editingProduct, name: e.target.value })} /></Field>
+        <div className="grid grid-cols-2 gap-3"><Field label="Price"><input type="number" className={inputClass} value={editingProduct.price ?? 0} onChange={e => setEditingProduct({ ...editingProduct, price: Number(e.target.value) })} /></Field><Field label="Stock"><input type="number" className={inputClass} value={editingProduct.stockQuantity ?? 0} onChange={e => setEditingProduct({ ...editingProduct, stockQuantity: Number(e.target.value), inStock: Number(e.target.value) > 0 })} /></Field></div>
+        <Field label="Gift Category"><select className={inputClass} value={editingProduct.giftCategoryId || ""} onChange={e => setEditingProduct({ ...editingProduct, giftCategoryId: e.target.value })}>{categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></Field>
+        <Field label="Occasion"><input className={inputClass} value={editingProduct.occasion || ""} onChange={e => setEditingProduct({ ...editingProduct, occasion: e.target.value })} /></Field>
+        <Field label="Main Image URL"><input className={inputClass} placeholder="https://.../image.jpg" value={editingProduct.mainImage || ""} onChange={e => setEditingProduct({ ...editingProduct, mainImage: e.target.value })} /><p className="text-[10px] text-stone-400 mt-1">Use a direct image URL, not a product-page or Google redirect URL.</p></Field>
+        <Field label="Description"><textarea className={inputClass} rows={3} value={editingProduct.description || ""} onChange={e => setEditingProduct({ ...editingProduct, description: e.target.value })} /></Field>
+      </Modal>}
 
-            <div className="space-y-3 text-xs">
-              <div>
-                <label className="block font-semibold mb-1">Product Name</label>
-                <input
-                  type="text"
-                  value={editingProduct.name || ""}
-                  onChange={(e) => setEditingProduct({ ...editingProduct, name: e.target.value })}
-                  className="w-full p-2 border rounded-lg"
-                />
-              </div>
+      {editingCategory && <Modal title={editingCategory.id ? "Edit Gift Category" : "Create Gift Category"} onClose={() => setEditingCategory(null)} onSave={() => save(() => editingCategory.id ? api.admin.updateGiftCategory(editingCategory.id, editingCategory) : api.admin.createGiftCategory(editingCategory), "Gift category saved successfully.").then(() => setEditingCategory(null))}><Field label="Category Name"><input className={inputClass} value={editingCategory.name || ""} onChange={e => setEditingCategory({ ...editingCategory, name: e.target.value })} /></Field><Field label="Image URL"><input className={inputClass} value={editingCategory.imageUrl || ""} onChange={e => setEditingCategory({ ...editingCategory, imageUrl: e.target.value })} /></Field><Field label="Description"><textarea className={inputClass} rows={3} value={editingCategory.description || ""} onChange={e => setEditingCategory({ ...editingCategory, description: e.target.value })} /></Field></Modal>}
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-semibold mb-1">Price (Rs.)</label>
-                  <input
-                    type="number"
-                    value={editingProduct.price || 0}
-                    onChange={(e) => setEditingProduct({ ...editingProduct, price: Number(e.target.value) })}
-                    className="w-full p-2 border rounded-lg"
-                  />
-                </div>
-                <div>
-                  <label className="block font-semibold mb-1">Original Price (Rs.)</label>
-                  <input
-                    type="number"
-                    value={editingProduct.originalPrice || 0}
-                    onChange={(e) => setEditingProduct({ ...editingProduct, originalPrice: Number(e.target.value) })}
-                    className="w-full p-2 border rounded-lg"
-                  />
-                </div>
-              </div>
+      {editingCombo && <Modal title={editingCombo.id ? "Edit Combo Pack" : "Create Combo Pack"} onClose={() => setEditingCombo(null)} onSave={() => save(() => editingCombo.id ? api.admin.updateGiftCombo(editingCombo.id, editingCombo) : api.admin.createGiftCombo(editingCombo), "Combo pack saved successfully.").then(() => setEditingCombo(null))}><Field label="Combo Name"><input className={inputClass} value={editingCombo.name || ""} onChange={e => setEditingCombo({ ...editingCombo, name: e.target.value })} /></Field><div className="grid grid-cols-2 gap-3"><Field label="Combo Price"><input type="number" className={inputClass} value={editingCombo.comboPrice ?? 0} onChange={e => setEditingCombo({ ...editingCombo, comboPrice: Number(e.target.value) })} /></Field><Field label="Individual Value"><input type="number" className={inputClass} value={editingCombo.individualValue ?? 0} onChange={e => setEditingCombo({ ...editingCombo, individualValue: Number(e.target.value) })} /></Field></div><Field label="Image URL"><input className={inputClass} value={editingCombo.image || ""} onChange={e => setEditingCombo({ ...editingCombo, image: e.target.value })} /></Field><Field label="Included Items"><input className={inputClass} placeholder="Flowers, Chocolate, Card" value={editingCombo.items?.join(", ") || ""} onChange={e => setEditingCombo({ ...editingCombo, items: e.target.value.split(",").map(x => x.trim()).filter(Boolean) })} /></Field><div className="grid grid-cols-2 gap-3"><Field label="Stock Count"><input type="number" className={inputClass} value={editingCombo.stockCount ?? 0} onChange={e => setEditingCombo({ ...editingCombo, stockCount: Number(e.target.value), inStock: Number(e.target.value) > 0 })} /></Field><Field label="Occasion"><input className={inputClass} value={editingCombo.occasion || ""} onChange={e => setEditingCombo({ ...editingCombo, occasion: e.target.value })} /></Field></div></Modal>}
 
-              <div>
-                <label className="block font-semibold mb-1">Gift Category</label>
-                <select
-                  value={editingProduct.giftCategoryId || ""}
-                  onChange={(e) => setEditingProduct({ ...editingProduct, giftCategoryId: e.target.value })}
-                  className="w-full p-2 border rounded-lg"
-                >
-                  {categories.map((c) => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
-                  ))}
-                </select>
-              </div>
+      {editingRec && <Modal title={editingRec.id ? "Edit Recommendation Rule" : "Create Recommendation Rule"} onClose={() => setEditingRec(null)} onSave={() => { if (!editingRec.targetId) { setError("Select a target first."); return Promise.resolve(); } return save(() => editingRec.id ? api.admin.updateGiftRecommendation(editingRec.id, editingRec) : api.admin.createGiftRecommendation(editingRec), "Recommendation rule saved successfully.").then(() => setEditingRec(null)); }}>
+        <Field label="When this target is viewed"><select className={inputClass} value={editingRec.targetType || "PRODUCT"} onChange={e => setEditingRec({ ...editingRec, targetType: e.target.value as any, targetId: "" })}><option value="PRODUCT">A Gift Product</option><option value="CATEGORY">A Gift Category</option></select></Field>
+        <Field label="Target"><select className={inputClass} value={editingRec.targetId || ""} onChange={e => setEditingRec({ ...editingRec, targetId: e.target.value })}>{editingRec.targetType === "CATEGORY" ? categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>) : products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></Field>
+        <Field label="Recommended Gifts"><select multiple className={`${inputClass} min-h-28`} value={editingRec.recommendedGiftIds || []} onChange={e => setEditingRec({ ...editingRec, recommendedGiftIds: Array.from(e.target.selectedOptions).map(o => o.value) })}>{products.filter(p => p.id !== editingRec.targetId).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select><p className="text-[10px] text-stone-400 mt-1">Hold Ctrl/Cmd to select multiple gifts.</p></Field>
+        <Field label="Priority"><input type="number" min={1} className={inputClass} value={editingRec.priority ?? 1} onChange={e => setEditingRec({ ...editingRec, priority: Number(e.target.value) })} /></Field>
+      </Modal>}
 
-              <div>
-                <label className="block font-semibold mb-1">Main Image URL</label>
-                <input
-                  type="text"
-                  value={editingProduct.mainImage || ""}
-                  onChange={(e) => setEditingProduct({ ...editingProduct, mainImage: e.target.value })}
-                  className="w-full p-2 border rounded-lg"
-                />
-              </div>
-
-              <div>
-                <label className="block font-semibold mb-1">Description</label>
-                <textarea
-                  rows={2}
-                  value={editingProduct.description || ""}
-                  onChange={(e) => setEditingProduct({ ...editingProduct, description: e.target.value })}
-                  className="w-full p-2 border rounded-lg"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-semibold mb-1">Stock Quantity</label>
-                  <input
-                    type="number"
-                    value={editingProduct.stockQuantity || 0}
-                    onChange={(e) => setEditingProduct({ ...editingProduct, stockQuantity: Number(e.target.value) })}
-                    className="w-full p-2 border rounded-lg"
-                  />
-                </div>
-                <div>
-                  <label className="block font-semibold mb-1">Occasion</label>
-                  <input
-                    type="text"
-                    value={editingProduct.occasion || ""}
-                    onChange={(e) => setEditingProduct({ ...editingProduct, occasion: e.target.value })}
-                    className="w-full p-2 border rounded-lg"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-2 pt-3 border-t">
-              <button onClick={() => setEditingProduct(null)} className="px-4 py-2 border rounded-lg text-xs">Cancel</button>
-              <button onClick={handleSaveProduct} className="px-4 py-2 bg-[#5A0F1B] text-white text-xs font-bold rounded-lg">Save Gift Product</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* EDIT/CREATE CATEGORY MODAL */}
-      {editingCategory && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 space-y-4">
-            <div className="flex justify-between items-center border-b pb-3">
-              <h3 className="font-cinzel font-bold text-sm text-[#5A0F1B]">
-                {editingCategory.id ? "Edit Gift Category" : "Create Gift Category"}
-              </h3>
-              <button onClick={() => setEditingCategory(null)}><X className="w-5 h-5" /></button>
-            </div>
-
-            <div className="space-y-3 text-xs">
-              <div>
-                <label className="block font-semibold mb-1">Category Name</label>
-                <input
-                  type="text"
-                  value={editingCategory.name || ""}
-                  onChange={(e) => setEditingCategory({ ...editingCategory, name: e.target.value })}
-                  className="w-full p-2 border rounded-lg"
-                />
-              </div>
-
-              <div>
-                <label className="block font-semibold mb-1">Image URL</label>
-                <input
-                  type="text"
-                  value={editingCategory.imageUrl || ""}
-                  onChange={(e) => setEditingCategory({ ...editingCategory, imageUrl: e.target.value })}
-                  className="w-full p-2 border rounded-lg"
-                />
-              </div>
-
-              <div>
-                <label className="block font-semibold mb-1">Description</label>
-                <textarea
-                  rows={2}
-                  value={editingCategory.description || ""}
-                  onChange={(e) => setEditingCategory({ ...editingCategory, description: e.target.value })}
-                  className="w-full p-2 border rounded-lg"
-                />
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-2 pt-3 border-t">
-              <button onClick={() => setEditingCategory(null)} className="px-4 py-2 border rounded-lg text-xs">Cancel</button>
-              <button onClick={handleSaveCategory} className="px-4 py-2 bg-[#5A0F1B] text-white text-xs font-bold rounded-lg">Save Category</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* EDIT/CREATE COMBO MODAL */}
-      {editingCombo && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 space-y-4">
-            <div className="flex justify-between items-center border-b pb-3">
-              <h3 className="font-cinzel font-bold text-sm text-[#5A0F1B]">
-                {editingCombo.id ? "Edit Gift Combo" : "Create Gift Combo Pack"}
-              </h3>
-              <button onClick={() => setEditingCombo(null)}><X className="w-5 h-5" /></button>
-            </div>
-
-            <div className="space-y-3 text-xs">
-              <div>
-                <label className="block font-semibold mb-1">Combo Pack Name</label>
-                <input
-                  type="text"
-                  value={editingCombo.name || ""}
-                  onChange={(e) => setEditingCombo({ ...editingCombo, name: e.target.value })}
-                  className="w-full p-2 border rounded-lg"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-semibold mb-1">Combo Price (Rs.)</label>
-                  <input
-                    type="number"
-                    value={editingCombo.comboPrice || 0}
-                    onChange={(e) => setEditingCombo({ ...editingCombo, comboPrice: Number(e.target.value) })}
-                    className="w-full p-2 border rounded-lg"
-                  />
-                </div>
-                <div>
-                  <label className="block font-semibold mb-1">Individual Value (Rs.)</label>
-                  <input
-                    type="number"
-                    value={editingCombo.individualValue || 0}
-                    onChange={(e) => setEditingCombo({ ...editingCombo, individualValue: Number(e.target.value) })}
-                    className="w-full p-2 border rounded-lg"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block font-semibold mb-1">Image URL</label>
-                <input
-                  type="text"
-                  value={editingCombo.image || ""}
-                  onChange={(e) => setEditingCombo({ ...editingCombo, image: e.target.value })}
-                  className="w-full p-2 border rounded-lg"
-                />
-              </div>
-
-              <div>
-                <label className="block font-semibold mb-1">Included Items (Comma separated)</label>
-                <input
-                  type="text"
-                  value={editingCombo.items?.join(", ") || ""}
-                  onChange={(e) => setEditingCombo({ ...editingCombo, items: e.target.value.split(",").map((s) => s.trim()) })}
-                  className="w-full p-2 border rounded-lg"
-                />
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-2 pt-3 border-t">
-              <button onClick={() => setEditingCombo(null)} className="px-4 py-2 border rounded-lg text-xs">Cancel</button>
-              <button onClick={handleSaveCombo} className="px-4 py-2 bg-[#5A0F1B] text-white text-xs font-bold rounded-lg">Save Combo Pack</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* EDIT/CREATE OFFER MODAL */}
-      {editingOffer && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 space-y-4">
-            <div className="flex justify-between items-center border-b pb-3">
-              <h3 className="font-cinzel font-bold text-sm text-[#5A0F1B]">
-                {editingOffer.id ? "Edit Exclusive Offer" : "Create Exclusive Offer"}
-              </h3>
-              <button onClick={() => setEditingOffer(null)}><X className="w-5 h-5" /></button>
-            </div>
-
-            <div className="space-y-3 text-xs">
-              <div>
-                <label className="block font-semibold mb-1">Offer Title</label>
-                <input
-                  type="text"
-                  value={editingOffer.title || ""}
-                  onChange={(e) => setEditingOffer({ ...editingOffer, title: e.target.value })}
-                  className="w-full p-2 border rounded-lg"
-                />
-              </div>
-
-              <div>
-                <label className="block font-semibold mb-1">Offer Type</label>
-                <select
-                  value={editingOffer.offerType || "TODAY"}
-                  onChange={(e) => setEditingOffer({ ...editingOffer, offerType: e.target.value as any })}
-                  className="w-full p-2 border rounded-lg"
-                >
-                  <option value="TODAY">TODAY</option>
-                  <option value="JEWELLERY">JEWELLERY</option>
-                  <option value="GIFT">GIFT</option>
-                  <option value="COUPLE">COUPLE</option>
-                  <option value="WEDDING">WEDDING</option>
-                  <option value="BIRTHDAY">BIRTHDAY</option>
-                  <option value="ANNIVERSARY">ANNIVERSARY</option>
-                  <option value="SEASONAL">SEASONAL</option>
-                </select>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-semibold mb-1">Discount %</label>
-                  <input
-                    type="number"
-                    value={editingOffer.discountPercent || 0}
-                    onChange={(e) => setEditingOffer({ ...editingOffer, discountPercent: Number(e.target.value) })}
-                    className="w-full p-2 border rounded-lg"
-                  />
-                </div>
-                <div>
-                  <label className="block font-semibold mb-1">Start Date</label>
-                  <input
-                    type="date"
-                    value={editingOffer.startDate ? editingOffer.startDate.split("T")[0] : ""}
-                    onChange={(e) => setEditingOffer({ ...editingOffer, startDate: new Date(e.target.value).toISOString() })}
-                    className="w-full p-2 border rounded-lg"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block font-semibold mb-1">Banner Image URL</label>
-                <input
-                  type="text"
-                  value={editingOffer.bannerImage || ""}
-                  onChange={(e) => setEditingOffer({ ...editingOffer, bannerImage: e.target.value })}
-                  className="w-full p-2 border rounded-lg"
-                />
-              </div>
-
-              <div>
-                <label className="block font-semibold mb-1">Description</label>
-                <textarea
-                  rows={2}
-                  value={editingOffer.description || ""}
-                  onChange={(e) => setEditingOffer({ ...editingOffer, description: e.target.value })}
-                  className="w-full p-2 border rounded-lg"
-                />
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-2 pt-3 border-t">
-              <button onClick={() => setEditingOffer(null)} className="px-4 py-2 border rounded-lg text-xs">Cancel</button>
-              <button onClick={handleSaveOffer} className="px-4 py-2 bg-[#5A0F1B] text-white text-xs font-bold rounded-lg">Save Offer</button>
-            </div>
-          </div>
-        </div>
-      )}
+      {editingOffer && <Modal title={editingOffer.id ? "Edit Exclusive Offer" : "Create Exclusive Offer"} onClose={() => setEditingOffer(null)} onSave={() => save(() => editingOffer.id ? api.admin.updateOffer(editingOffer.id, editingOffer) : api.admin.createOffer(editingOffer), "Offer saved successfully.").then(() => setEditingOffer(null))}>
+        <Field label="Offer Title"><input className={inputClass} value={editingOffer.title || ""} onChange={e => setEditingOffer({ ...editingOffer, title: e.target.value })} /></Field>
+        <Field label="Description"><textarea className={inputClass} rows={2} value={editingOffer.description || ""} onChange={e => setEditingOffer({ ...editingOffer, description: e.target.value })} /></Field>
+        <div className="grid grid-cols-2 gap-3"><Field label="Offer Type"><select className={inputClass} value={editingOffer.offerType || "GIFT"} onChange={e => setEditingOffer({ ...editingOffer, offerType: e.target.value as any })}>{["TODAY","JEWELLERY","GIFT","COUPLE","WEDDING","BIRTHDAY","ANNIVERSARY","SEASONAL","PROMOTION"].map(x => <option key={x}>{x}</option>)}</select></Field><Field label="Discount %"><input type="number" min={0} max={100} className={inputClass} value={editingOffer.discountPercent ?? 0} onChange={e => setEditingOffer({ ...editingOffer, discountPercent: Number(e.target.value) })} /></Field></div>
+        <div className="grid grid-cols-2 gap-3"><Field label="Start Date"><input type="datetime-local" className={inputClass} value={editingOffer.startDate ? editingOffer.startDate.slice(0, 16) : ""} onChange={e => setEditingOffer({ ...editingOffer, startDate: new Date(e.target.value).toISOString() })} /></Field><Field label="End Date"><input type="datetime-local" className={inputClass} value={editingOffer.endDate ? editingOffer.endDate.slice(0, 16) : ""} onChange={e => setEditingOffer({ ...editingOffer, endDate: e.target.value ? new Date(e.target.value).toISOString() : "" })} /></Field></div>
+        <Field label="Banner Image URL"><input className={inputClass} placeholder="https://.../banner.jpg" value={editingOffer.bannerImage || ""} onChange={e => setEditingOffer({ ...editingOffer, bannerImage: e.target.value })} /></Field>
+        <Field label="Apply this offer to Gift Products"><select multiple className={`${inputClass} min-h-28`} value={editingOffer.applicableProductIds || []} onChange={e => setEditingOffer({ ...editingOffer, applicableProductIds: Array.from(e.target.selectedOptions).map(o => o.value) })}>{products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select><p className="text-[10px] text-stone-400 mt-1">Select products. Leave empty if the offer should cover all products of the selected category/type.</p></Field>
+        <Field label="OR apply to Gift Categories"><select multiple className={`${inputClass} min-h-24`} value={editingOffer.applicableCategoryIds || []} onChange={e => setEditingOffer({ ...editingOffer, applicableCategoryIds: Array.from(e.target.selectedOptions).map(o => o.value) })}>{categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></Field>
+        <Field label="Terms & Conditions"><textarea className={inputClass} rows={2} value={editingOffer.termsAndConditions || ""} onChange={e => setEditingOffer({ ...editingOffer, termsAndConditions: e.target.value })} /></Field>
+      </Modal>}
     </div>
   );
+};
+
+const Field: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => <div className="space-y-1"><label className="block font-semibold text-xs text-stone-700">{label}</label>{children}</div>;
+
+const Modal: React.FC<{ title: string; onClose: () => void; onSave: () => Promise<any>; children: React.ReactNode }> = ({ title, onClose, onSave, children }) => {
+  const [saving, setSaving] = useState(false);
+  const handleSave = async () => { setSaving(true); try { await onSave(); } finally { setSaving(false); } };
+  return <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"><div className="bg-white rounded-2xl max-w-xl w-full max-h-[90vh] overflow-y-auto p-6 space-y-4 shadow-2xl"><div className="flex justify-between items-center border-b pb-3"><h3 className="font-cinzel font-bold text-base text-[#5A0F1B]">{title}</h3><button onClick={onClose}><X className="w-5 h-5" /></button></div><div className="space-y-3">{children}</div><div className="flex justify-end gap-2 pt-3 border-t"><button onClick={onClose} className="px-4 py-2 border rounded-lg text-xs">Cancel</button><button disabled={saving} onClick={handleSave} className="px-4 py-2 bg-[#5A0F1B] text-white text-xs font-bold rounded-lg flex items-center gap-1.5 disabled:opacity-50"><Save className="w-4 h-4" />{saving ? "Saving..." : "Save"}</button></div></div></div>;
 };
