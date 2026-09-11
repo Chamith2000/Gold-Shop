@@ -143,9 +143,45 @@ public class GiftsOffersController {
             map.put("active", record.getActive());
             map.put("createdAt", record.getCreatedAt());
             map.put("updatedAt", record.getUpdatedAt());
+            normalize(record.getRecordType(), map);
             return map;
         } catch (Exception e) {
             throw new IllegalStateException("Invalid stored Gift & Offers data", e);
+        }
+    }
+
+    private void normalize(String type, Map<String, Object> map) {
+        if ("CATEGORY".equals(type)) {
+            map.putIfAbsent("name", "Gift Category");
+            map.putIfAbsent("description", "Luxury celebration gifts");
+            map.putIfAbsent("imageUrl", "https://images.unsplash.com/photo-1549465220-1a8b9238cd48?auto=format&fit=crop&w=800&q=80");
+            map.putIfAbsent("displayOrder", 0);
+            map.putIfAbsent("active", true);
+        } else if ("PRODUCT".equals(type)) {
+            map.putIfAbsent("name", "Gift Product");
+            map.putIfAbsent("description", "A special gift for your celebration.");
+            map.putIfAbsent("fullDescription", map.get("description"));
+            map.putIfAbsent("mainImage", "https://images.unsplash.com/photo-1549465220-1a8b9238cd48?auto=format&fit=crop&w=800&q=80");
+            map.putIfAbsent("images", new ArrayList<>());
+            map.putIfAbsent("price", 0);
+            map.putIfAbsent("stockQuantity", 0);
+            map.putIfAbsent("inStock", number(map.get("stockQuantity")) > 0);
+            map.putIfAbsent("isFeatured", false);
+            map.putIfAbsent("isPopular", false);
+            map.putIfAbsent("isNewArrival", false);
+        } else if ("COMBO".equals(type)) {
+            map.putIfAbsent("name", "Gift Combo Pack");
+            map.putIfAbsent("description", "A curated celebration gift combo.");
+            map.putIfAbsent("image", "https://images.unsplash.com/photo-1513151233558-d860c5398176?auto=format&fit=crop&w=800&q=80");
+            map.putIfAbsent("items", new ArrayList<>());
+            map.putIfAbsent("individualValue", 0);
+            map.putIfAbsent("comboPrice", 0);
+            double individualValue = number(map.get("individualValue"));
+            double comboPrice = number(map.get("comboPrice"));
+            map.putIfAbsent("youSave", Math.max(0, individualValue - comboPrice));
+            map.putIfAbsent("inStock", true);
+            map.putIfAbsent("stockCount", 0);
+            map.putIfAbsent("active", true);
         }
     }
 
