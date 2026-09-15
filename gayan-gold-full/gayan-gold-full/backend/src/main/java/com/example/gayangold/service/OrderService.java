@@ -146,9 +146,8 @@ public class OrderService {
         profile.setLifetimeRedeemed(profile.getLifetimeRedeemed() + pointsRedeemed);
         RewardProfile savedProfile = rewardProfileRepository.save(profile);
 
-        // The listener runs AFTER COMMIT. A WhatsApp/API failure therefore cannot
-        // roll back a successfully placed order.
-        eventPublisher.publishEvent(new OrderCreatedEvent(saved));
+        // External notifications are handled only after this transaction commits.
+        eventPublisher.publishEvent(new OrderCreatedEvent(saved.getId()));
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("message", "Order placed successfully");
