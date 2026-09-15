@@ -6,11 +6,13 @@ import com.example.gayangold.entity.Product;
 import com.example.gayangold.entity.RewardProfile;
 import com.example.gayangold.entity.User;
 import com.example.gayangold.exception.ApiException;
+import com.example.gayangold.notification.OrderCreatedEvent;
 import com.example.gayangold.repository.OrderRepository;
 import com.example.gayangold.repository.ProductRepository;
 import com.example.gayangold.repository.RewardProfileRepository;
 import com.example.gayangold.util.IdGenerator;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,6 +31,7 @@ public class OrderService {
     private final ProductRepository productRepository;
     private final RewardProfileRepository rewardProfileRepository;
     private final AuthService authService;
+    private final ApplicationEventPublisher eventPublisher;
 
     @SuppressWarnings("unchecked")
     @Transactional
@@ -142,6 +145,10 @@ public class OrderService {
         profile.setLifetimeEarned(profile.getLifetimeEarned() + earnedPoints);
         profile.setLifetimeRedeemed(profile.getLifetimeRedeemed() + pointsRedeemed);
         RewardProfile savedProfile = rewardProfileRepository.save(profile);
+
+        // The listener runs AFTER COMMIT. A WhatsApp/API failure therefore cannot
+        // roll back a successfully placed order.
+        eventPublisher.publishEvent(new OrderCreatedEvent(saved));
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("message", "Order placed successfully");
