@@ -75,11 +75,14 @@ public class WhatsAppNotificationService {
         List<Map<String, Object>> parameters = new ArrayList<>();
         parameters.add(textParameter(order.getOrderNumber()));
         parameters.add(textParameter(order.getCustomerName()));
+        parameters.add(textParameter(order.getUser() != null ? order.getUser().getPhone() : null));
         parameters.add(textParameter(buildItemSummary(order)));
         parameters.add(textParameter(formatMoney(order.getSubtotal())));
         parameters.add(textParameter(formatMoney(order.getDiscountAmount())));
         parameters.add(textParameter(formatMoney(order.getShippingFee())));
         parameters.add(textParameter(formatMoney(order.getTotalAmount())));
+        parameters.add(textParameter(order.getPaymentStatus() != null ? order.getPaymentStatus().name() : null));
+        parameters.add(textParameter(order.getOrderStatus() != null ? order.getOrderStatus().name() : null));
         parameters.add(textParameter(buildAddress(order)));
 
         Map<String, Object> bodyComponent = new LinkedHashMap<>();
