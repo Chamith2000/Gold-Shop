@@ -14,7 +14,7 @@ public interface OrderRepository extends JpaRepository<OrderEntity, String> {
     Optional<OrderEntity> findByOrderNumber(String orderNumber);
     List<OrderEntity> findAllByOrderByCreatedAtDesc();
 
-    @EntityGraph(attributePaths = {"items"})
+    @EntityGraph(attributePaths = {"items", "user"})
     @Query("select o from OrderEntity o where o.id = :id")
     Optional<OrderEntity> findWithItemsById(@Param("id") String id);
 
