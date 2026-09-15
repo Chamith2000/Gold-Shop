@@ -1,10 +1,9 @@
 package com.example.gayangold.notification;
 
-import com.example.gayangold.entity.OrderEntity;
-
 /**
- * Published after an order has been persisted so external notifications do not
- * participate in the database transaction.
+ * Lightweight domain event published after an order is created.
+ * The listener reloads the order after commit, avoiding lazy-loading and
+ * transaction-bound entity problems in asynchronous notification handling.
  */
-public record OrderCreatedEvent(OrderEntity order) {
+public record OrderCreatedEvent(String orderId) {
 }
