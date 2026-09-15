@@ -27,6 +27,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class OrderService {
 
+    private static final int POINTS_PER_RUPEE = 100;
     private final OrderRepository orderRepository;
     private final ProductRepository productRepository;
     private final RewardProfileRepository rewardProfileRepository;
@@ -90,10 +91,14 @@ public class OrderService {
                 ? Integer.parseInt(body.get("pointsToRedeem").toString()) : 0;
         int maxRedeemable = Math.min(
                 profile.getCurrentPoints(),
-                subtotal.multiply(BigDecimal.valueOf(0.3)).setScale(0, RoundingMode.FLOOR).intValue());
+                subtotal.multiply(BigDecimal.valueOf(0.3))
+                        .multiply(BigDecimal.valueOf(POINTS_PER_RUPEE))
+                        .setScale(0, RoundingMode.FLOOR).intValue());
         int pointsRedeemed = Math.max(0, Math.min(requestedPoints, maxRedeemable));
 
-        BigDecimal discountAmount = BigDecimal.valueOf(pointsRedeemed);
+        // 100 points = Rs. 1.00
+        BigDecimal discountAmount = BigDecimal.valueOf(pointsRedeemed)
+                .divide(BigDecimal.valueOf(POINTS_PER_RUPEE), 2, RoundingMode.HALF_UP);
         BigDecimal shippingFee = BigDecimal.ZERO;
         BigDecimal totalAmount = subtotal.subtract(discountAmount).add(shippingFee);
         if (totalAmount.compareTo(BigDecimal.ZERO) < 0) {
@@ -146,7 +151,6 @@ public class OrderService {
         profile.setLifetimeRedeemed(profile.getLifetimeRedeemed() + pointsRedeemed);
         RewardProfile savedProfile = rewardProfileRepository.save(profile);
 
-        // External notifications are handled only after this transaction commits.
         eventPublisher.publishEvent(new OrderCreatedEvent(saved.getId()));
 
         Map<String, Object> result = new LinkedHashMap<>();
