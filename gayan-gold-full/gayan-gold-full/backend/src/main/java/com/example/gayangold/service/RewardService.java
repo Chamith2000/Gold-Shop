@@ -13,10 +13,13 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -25,6 +28,7 @@ import java.util.Random;
 @RequiredArgsConstructor
 public class RewardService {
     private static final long COOLDOWN_SECONDS = 24 * 60 * 60;
+    public static final int POINTS_PER_RUPEE = 100;
     private final RewardProfileRepository profileRepository;
     private final RewardTransactionRepository transactionRepository;
     private final LuckySpinRecordRepository spinRepository;
@@ -54,6 +58,30 @@ public class RewardService {
         result.put("lastSpunAt", previous == null ? null : previous.getSpunAt());
         result.put("nextEligibleAt", next);
         result.put("segments", segments.stream().map(Segment::toMap).toList());
+        return result;
+    }
+
+    public Map<String, Object> calculateDiscount(User user, int pointsToRedeem, BigDecimal orderTotal) {
+        RewardProfile profile = getOrCreateProfile(user);
+        if (pointsToRedeem < 0) {
+            throw ApiException.badRequest("Points to redeem cannot be negative.");
+        }
+        int availablePoints = profile.getCurrentPoints();
+        int maxByOrder = orderTotal == null
+                ? availablePoints
+                : orderTotal.multiply(BigDecimal.valueOf(0.30))
+                    .multiply(BigDecimal.valueOf(POINTS_PER_RUPEE))
+                    .setScale(0, RoundingMode.FLOOR)
+                    .intValue();
+        int redeemablePoints = Math.min(pointsToRedeem, Math.min(availablePoints, Math.max(0, maxByOrder)));
+        BigDecimal discountAmount = BigDecimal.valueOf(redeemablePoints)
+                .divide(BigDecimal.valueOf(POINTS_PER_RUPEE), 2, RoundingMode.HALF_UP);
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("pointsToRedeem", redeemablePoints);
+        result.put("discountAmount", discountAmount);
+        result.put("availablePointsAfter", availablePoints - redeemablePoints);
+        result.put("currency", "LKR");
+        result.put("conversionRate", "100 points = Rs. 1.00");
         return result;
     }
 
@@ -89,6 +117,8 @@ public class RewardService {
         result.put("message", reward > 0 ? "Congratulations! You won " + reward + " points." : "Better luck next time!");
         result.put("winningSegment", segment.toMap());
         result.put("rewardPoints", reward);
+        result.put("rewardValueRupees", BigDecimal.valueOf(reward)
+                .divide(BigDecimal.valueOf(POINTS_PER_RUPEE), 2, RoundingMode.HALF_UP));
         result.put("rewardProfile", authService.toProfileMap(profile));
         result.put("nextEligibleAt", next);
         result.put("secondsRemaining", COOLDOWN_SECONDS);
