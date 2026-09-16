@@ -21,7 +21,6 @@ public class OrderCreatedNotificationListener {
 
     @Async
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    @Transactional(readOnly = true)
     public void handle(OrderCreatedEvent event) {
         try {
             OrderEntity order = orderRepository.findWithItemsById(event.orderId()).orElse(null);
